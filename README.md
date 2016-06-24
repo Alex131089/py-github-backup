@@ -19,6 +19,13 @@ script can be run multiple times to incrementally backup repos over time.)
 - it has been roughly thrown together, with minimal testing - I've used it without problems, but YMMV. Use at own risk!
 - beware of Github rate-limiting - probably shouldn't run it too often. ;)
 
+### TODO
+
+- more commandline flags for finer control over what to backup or not
+- custom include/exclude list (git/github urls) in args
+- run git commands in parallel to speed up the process
+
+Feel free to send me comments, open issues, or submit pull requests!
 
 ## Installation
 
