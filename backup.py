@@ -49,8 +49,23 @@ for url in urls:
 
 print(repos)
 
-cwd = os.getcwd()
+root = os.getcwd()
+# TODO: choose dir from args optional
 
-# 1. layout a file hierarchy to clone repos into (mkdir owner for owners)
-# 2. use subprocess popen to call git clone --mirror for each
-#    - can spawn multiple processes at once for parallel downloading
+# make all the user dirs
+to_run = []
+for user in repos:
+    os.mkdir(os.join(root, user))
+    for repo in repos[user]:
+        url = repos[user][repo]
+        path = os.join(os.join(root, user), repo)
+        # check if exists
+        if os.access(path, os.F_OK):
+            to_run.append({'path': path, 'command': ['git', 'fetch', '--recurse-submodules=yes', '-t']})
+        else:
+            to_run.append({'command': ['git', 'clone', '--recursive', url, path]})
+
+for command in to_run:
+    # subprocess.run(command['command'], cwd=command.get('path', None))
+    print(command)
+
