@@ -17,12 +17,12 @@ parser.add_argument(
     '-t', '--token',
     default=os.getenv('GITHUB_API_TOKEN'),
     help='api token for auth (defaults to env GITHUB_API_TOKEN) - if not available, auth disabled')
-parser.add_argument('-S', '--starred',  action='store_true', help='backp user starred repos')
-parser.add_argument('-U', '--user',  action='store_true', help='backup user repos (requires auth)')
+parser.add_argument('-S', '--starred',  action='store_true', help='backup user starred repos')
+parser.add_argument('-R', '--repos',  action='store_true', help='backup user repos (requires auth for private repos)')
 parser.add_argument('-A', '--all',  action='store_true', help='backup all options')
-parser.add_argument('-u', '--usergists',  action='store_true', help='backup user gists')
+parser.add_argument('-g', '--gists',  action='store_true', help='backup user gists')
 parser.add_argument('-s', '--starredgists',  action='store_true', help='backup user starred gists (requires auth)')
-parser.add_argument('-n', '--userunauth',  action='store_true', help='backup user gists (without auth token)')
+parser.add_argument('-z', '--ssh',  action='store_true', help='use ssh urls instead of https')
 args = parser.parse_args()
 
 user = args.username
@@ -42,6 +42,7 @@ def get_repos(data):
     url = data.get('url')
     params = data.get('params', None)
     key = data.get('clone-key', 'clone_url')
+    format_url = data.get('format', None)
     new_repos = []
     while True:
         res = None
@@ -54,7 +55,7 @@ def get_repos(data):
             sys.exit(1)
         for repo in res_repos:
             new_repos.append({'owner': repo['owner']['login'],
-                          'clone_url': repo[key]})
+                          'clone_url': format_url.format(repo[key]) if format_url else repo[key]})
 
         next_link = res.links.get('next', None)
         if next_link:
@@ -66,51 +67,52 @@ def get_repos(data):
 
 urls = []
 
-# user repos, including those the user is a member of (includes private repos)
-if args.all or args.user:
-    if not args.token:
-        print('token needed - user repos requires authentication')
-        sys.exit(1)
-    urls.append({
-        'url': 'https://api.github.com/user/repos',
-        'params': {'type': 'all'},
-        'type': 'repos'
-        })
-
-# user repos, including those the user is a member of (un-auth version)
-# only do this in certain cases
-if (args.all and not args.token) or (args.userunauth and not args.user and not args.all):
-    urls.append({
-        'url': 'https://api.github.com/users/{}/repos'.format(user),
-        'params': {'type': 'all'},
-        'type': 'repos'
-        })
+# user repos
+if args.all or args.repos:
+    if args.token:
+        urls.append({
+            'url': 'https://api.github.com/user/repos',
+            'params': {'type': 'all'},
+            'type': 'repos',
+            'clone-key': 'ssh_url' if args.ssh else 'clone_url'
+            })
+    else:
+        print('no auth - private repos not going to be fetched')
+        urls.append({
+            'url': 'https://api.github.com/users/{}/repos'.format(user),
+            'params': {'type': 'all'},
+            'type': 'repos',
+            'clone-key': 'ssh_url' if args.ssh else 'clone_url'
+            })
 
 # user starred repos
 if args.all or args.starred:
     urls.append({
         'url': 'https://api.github.com/users/{}/starred'.format(user),
-        'type': 'starred-repos'
+        'type': 'starred-repos',
+        'clone-key': 'ssh_url' if args.ssh else 'clone_url'
         })
 
 # user gists
-if args.all or args.usergists:
+if args.all or args.gists:
     urls.append({
         'url': 'https://api.github.com/users/{}/gists'.format(user),
         'type': 'gists',
-        'clone-key': 'git_pull_url'
+        'clone-key': 'git_pull_url' if not args.ssh else 'id',
+        'format': 'git@gist.github.com:{}.git' if args.ssh else None
         })
 
 # starred gists
 if args.all or args.starredgists:
-    if not args.token:
-        print('token needed - starred gists requires authentication')
-        sys.exit(1)
-    urls.append({
-        'url': 'https://api.github.com/gists/starred',
-        'type': 'starred-gists',
-        'clone-key': 'git_pull_url'
-        })
+    if args.token:
+        urls.append({
+            'url': 'https://api.github.com/gists/starred',
+            'type': 'starred-gists',
+            'clone-key': 'git_pull_url' if not args.ssh else 'id',
+            'format': 'git@gist.github.com:{}.git' if args.ssh else None
+            })
+    else:
+        print('skipping starred gists - auth required')
 
 
 # build a list of repos to clone/update
@@ -155,6 +157,7 @@ for subdir in repos:
 
 # TODO: spawn multiple processes at once for parallel downloading
 # actually run the git commands!
+
 for command in to_run:
     print(command)
     subprocess.run(command['command'], cwd=command.get('path', None))
