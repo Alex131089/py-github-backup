@@ -40,8 +40,8 @@ python github-backup.py [args] username
 
 ```
 $ python github-backup.py --help
-usage: github-backup.py [-h] [-d DIRECTORY] [-t TOKEN] [-S] [-U] [-A] [-u]
-                        [-s] [-n]
+usage: github-backup.py [-h] [-d DIRECTORY] [-t TOKEN] [-S] [-R] [-A] [-g]
+                        [-s] [-z]
                         username
 
 Backup (clone) github repos.
@@ -56,12 +56,12 @@ optional arguments:
   -t TOKEN, --token TOKEN
                         api token for auth (defaults to env GITHUB_API_TOKEN)
                         - if not available, auth disabled
-  -S, --starred         backp user starred repos
-  -U, --user            backup user repos (requires auth)
+  -S, --starred         backup user starred repos
+  -R, --repos           backup user repos (requires auth for private repos)
   -A, --all             backup all options
-  -u, --usergists       backup user gists
+  -g, --gists           backup user gists
   -s, --starredgists    backup user starred gists (requires auth)
-  -n, --userunauth      backup user gists (without auth token)
+  -z, --ssh             use ssh urls instead of https
 ```
 
 Example: `python github-backup.py -A -t secret-token myusername`

@@ -130,7 +130,7 @@ for url in urls:
 # clone or update existing) - also make any necessary dirs
 root = os.path.realpath(args.directory)
 to_run = []
-NAME = re.compile(r'^.*/([^/]+)\.git$')
+NAME = re.compile(r'^.*(?:/|:)([^/:]+)\.git$')
 
 for subdir in repos:
     sub_root = os.path.join(root, subdir)
