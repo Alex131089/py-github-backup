@@ -2,6 +2,7 @@ import requests
 import subprocess
 import os
 import argparse
+from pprint import pprint
 
 parser = argparse.ArgumentParser(description='Backup (clone) github repos.')
 
@@ -118,7 +119,10 @@ if args.all or args.starredgists:
         data = get_json('https://api.github.com/gists/starred', auth=auth)
         for repo in data:
             r = Repo()
-            r.owner = repo['owner']['login']
+            try:
+                r.owner = repo['owner']['login']
+            except KeyError:
+                pass
             r.name = repo['id']
             if args.ssh:
                 r.url = 'git@gist.github.com:{}.git'.format(repo['id'])
@@ -138,8 +142,11 @@ root = os.path.realpath(args.directory)
 to_run = []
 for repo in repos:
     sub_root = os.path.join(root, repo.subdir)
-    os.makedirs(os.path.join(sub_root, repo.owner), exist_ok=True)
-    owner_root = os.path.join(sub_root, repo.owner)
+    if repo.owner:
+        os.makedirs(os.path.join(sub_root, repo.owner), exist_ok=True)
+        owner_root = os.path.join(sub_root, repo.owner)
+    else:
+        owner_root = sub_root
     path = os.path.join(owner_root, repo.name)
 
     # check if exists
