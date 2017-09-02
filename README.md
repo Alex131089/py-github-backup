@@ -8,9 +8,13 @@ Copyright © 2016 Samuel Walladge
 ## About
 
 This script is able to download your repos (including ones you are a collaborator on), starred repos, gists, and starred
-gists from Github, into a structured directory for convenience. It currently does `git clone --recursive <url>` for
-each repo, or `git fetch --recurse-submodules=yes -t` if the directory already exists in the backup dir. (So the
+gists from Github, into a structured directory for convenience. It currently does `git clone --mirror` for
+each repo, or `git remote update --prune` if the directory already exists in the backup dir. (So the
 script can be run multiple times to incrementally backup repos over time.)
+
+This _should_ keep a synced mirror of each github repo in the local filesystem.
+To work with one of the repos, you can simply clone a working copy somewhere.
+
 
 ### Notes
 

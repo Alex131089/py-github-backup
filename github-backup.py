@@ -147,20 +147,20 @@ for repo in repos:
         owner_root = os.path.join(sub_root, repo.owner)
     else:
         owner_root = sub_root
-    path = os.path.join(owner_root, repo.name)
+    path = os.path.join(owner_root, repo.name) + '.git'
 
     # check if exists
     if os.access(path, os.F_OK):
         # fetch, so shouldn't overwrite any local changes
         to_run.append({
             'path': path,
-            'command': ['git', 'fetch', '--recurse-submodules=yes', '-t']})
+            'command': ['git', 'remote', 'update', '--prune']})
     else:
         # this method doesn't clone a bare repo - rather the client-side
         # style we can work withh straight away
         to_run.append({
             'path': owner_root,
-            'command': ['git', 'clone', '--recursive', repo.url]})
+            'command': ['git', 'clone', '--mirror', repo.url]})
 
 
 # TODO: spawn multiple processes at once for parallel downloading
