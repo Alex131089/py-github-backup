@@ -2,6 +2,8 @@ import requests
 import subprocess
 import os
 import argparse
+import json, glob
+from collections import OrderedDict
 from pprint import pprint
 
 parser = argparse.ArgumentParser(description='Backup (clone) github repos.')
@@ -36,18 +38,26 @@ class Repo():
         self.name = None
         self.owner = None
         self.subdir = None
+        self.gist = None
 
+class Gist():
+    def __init__(self):
+        self.created_at = None
+        self.description = None
+        self.file_count = None
+        self.first_file = None
+        self.comments = None
 
 # function to get json data from server
-def get_json(url, params=None, auth=None):
+def get_json(url, params=None, auth=None, dict_ordered=False):
     data = []
     while True:
         res = None
         js = None
         try:
             res = requests.get(url, params=params, auth=auth)
-            js = res.json()
-        except:
+            js = res.json(object_pairs_hook=(OrderedDict if dict_ordered else None))
+        except Exception as e:
             print("error getting data for url {}".format(url))
         for j in js:
             data.append(j)
@@ -59,7 +69,6 @@ def get_json(url, params=None, auth=None):
             break
 
     return data
-
 
 # user repos
 if args.all or args.repos:
@@ -100,7 +109,7 @@ if args.all or args.starred:
 
 # user gists
 if args.all or args.gists:
-    data = get_json('https://api.github.com/users/{}/gists'.format(user), auth=auth)
+    data = get_json('https://api.github.com/users/{}/gists'.format(user), auth=auth, dict_ordered=True)
     for repo in data:
         r = Repo()
         r.owner = repo['owner']['login']
@@ -109,6 +118,19 @@ if args.all or args.gists:
             r.url = 'git@gist.github.com:{}.git'.format(repo['id'])
         else:
             r.url = repo['git_pull_url']
+
+        # More informations for the gists
+        g = Gist()
+        if repo['created_at']:
+            g.created_at = repo['created_at'][0:19].replace('T', '_').replace(':', ".")
+            r.name = '{}_{}'.format(g.created_at, r.name)
+        if repo['description']:
+            g.description = repo['description']
+        g.file_count = len(repo['files'])
+        g.first_file = next(iter(repo['files'].keys()))
+        if repo['comments'] > 0:
+            g.comments = repo['comments_url']
+        r.gist = g
 
         r.subdir = 'gists'
         repos.append(r)
@@ -147,20 +169,41 @@ for repo in repos:
         owner_root = os.path.join(sub_root, repo.owner)
     else:
         owner_root = sub_root
-    path = os.path.join(owner_root, repo.name) + '.git'
+    repo_path = os.path.join(owner_root, repo.name)
 
     # check if exists
-    if os.access(path, os.F_OK):
+    if os.path.exists(repo_path):
         # fetch, so shouldn't overwrite any local changes
         to_run.append({
-            'path': path,
-            'command': ['git', 'remote', 'update', '--prune']})
+            'path': repo_path,
+            #'command': ['git', 'remote', 'update', '--prune']})
+            'command': ['git', 'pull', '--all']})
     else:
         # this method doesn't clone a bare repo - rather the client-side
         # style we can work withh straight away
         to_run.append({
             'path': owner_root,
-            'command': ['git', 'clone', '--mirror', repo.url]})
+            #'command': ['git', 'clone', '--mirror', repo.url]})
+            'command': ['git', 'clone', '--recursive', repo.url, repo.name]})
+
+    # For gist repo, overwrite description & comments
+    if repo.gist is not None:
+        # Remove old "first file" files
+        old_first_file_patterm = os.path.join(owner_root, '{}_*.description'.format(repo.name))
+        for old_first in glob.glob(old_first_file_patterm):
+            os.remove(old_first)
+        # Create the current
+        first_file_path = os.path.join(owner_root, '{}_({})_{}.description'.format(repo.name, repo.gist.file_count, repo.gist.first_file))
+        with open(first_file_path, 'w', encoding='utf8') as df:
+            # Create / update description file
+            if repo.gist.description:
+                df.write(repo.gist.description)
+        # Create / update comments file
+        if repo.gist.comments:
+            get_json(repo.gist.comments, auth=auth)
+            comments_path = os.path.join(owner_root, '{}.comments'.format(repo.name, repo.gist.file_count, repo.gist.first_file))
+            with open(comments_path, 'w') as df:
+                json.dump(repo.gist.description, df, ensure_ascii=False, indent='\t')
 
 
 # TODO: spawn multiple processes at once for parallel downloading
@@ -168,4 +211,5 @@ for repo in repos:
 # actually run the git commands!
 for command in to_run:
     print(command)
-    subprocess.run(command['command'], cwd=command.get('path', None))
+    #subprocess.run(command['command'], cwd=command.get('path', None))
+    subprocess.call(command['command'], cwd=command.get('path', None))
